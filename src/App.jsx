@@ -118,7 +118,7 @@ const GRUPOS = {
        ]},
 };
 
-const ALL_TEAMS = Object.values(GRUPOS).flatMap(g => g.equipos);
+const ALL_TEAMS = Object.values(GRUPOS).flatMap(g => g.equipos).sort((a, b) => a.localeCompare(b, 'es'));
 
 const STORAGE_KEY = "mundial2026_v4";
 
