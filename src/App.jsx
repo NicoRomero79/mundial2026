@@ -380,18 +380,24 @@ function PaginaRegistro({ onRegistrado, onVerRanking }) {
  }
 
 async function iniciarSesion() {
-    if (!nombre.trim()) { setMsg("⚠️ Ingresa tu nombre"); return; }
-    setLoading(true);
-    const { data, error } = await supabase
-      .from('predicciones')
-      .select('*')
-      .eq('nombre', nombre.trim())
-      .single();
-    setLoading(false);
-    if (error || !data) { setMsg("⚠️ Usuario no encontrado"); return; }
-    onRegistrado({ nombre: data.nombre, telefono: data.telefono, sel1: data.seleccion1, sel2: data.seleccion2 }, true);
-  }
+  if (!nombre.trim()) { setMsg("⚠️ Ingresa tu nombre"); return; }
+  setLoading(true);
+  const { data, error } = await supabase
+    .from('predicciones')
+    .select('*')
+    .eq('nombre', nombre.trim())
+    .single();
+  setLoading(false);
+  if (error || !data) { setMsg("⚠️ Usuario no encontrado"); return; }
 
+  // Si ya tiene scores guardados, va directo al ranking
+  // Si no, va a completar marcadores
+  const tieneScores = data.scores && Object.keys(data.scores).length > 0;
+  onRegistrado(
+    { nombre: data.nombre, telefono: data.telefono, sel1: data.seleccion1, sel2: data.seleccion2 },
+    tieneScores  // true = va a ranking, false = va a marcadores
+  );
+}
 
   return (
     <div style={{padding:"16px", maxWidth:"500px", margin:"0 auto"}}>
