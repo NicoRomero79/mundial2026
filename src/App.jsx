@@ -271,8 +271,19 @@ function MatchCard({ partido, scores, onChange }) {
 }
 
 function TablaGrupo({ grupo, scores }) {
-  const clasificacion = grupo.equipos.map(e => ({ e, ...calcPts(e, scores) }))
-    .sort((a,b) => b.pts - a.pts || (b.gf-b.gc) - (a.gf-a.gc) || b.gf - a.gf);
+  const clasificacion = grupo.equipos.map(e => {
+    let pts=0, gf=0, gc=0, pj=0;
+    grupo.partidos.forEach(p => {
+      const sc = scores[p.id];
+      if (!sc || sc.g1==="" || sc.g2==="") return;
+      const g1=parseInt(sc.g1), g2=parseInt(sc.g2);
+      if (isNaN(g1)||isNaN(g2)) return;
+      if (p.e1===e) { pj++; gf+=g1; gc+=g2; if(g1>g2) pts+=3; else if(g1===g2) pts+=1; }
+      if (p.e2===e) { pj++; gf+=g2; gc+=g1; if(g2>g1) pts+=3; else if(g1===g2) pts+=1; }
+    });
+    return { e, pts, gf, gc, pj };
+  }).sort((a,b) => b.pts - a.pts || (b.gf-b.gc) - (a.gf-a.gc) || b.gf - a.gf);
+
   return (
     <div style={{fontSize:"0.75rem", marginTop:"10px"}}>
       <div style={{display:"grid", gridTemplateColumns:"1fr 32px 32px 32px 32px 36px",
@@ -577,10 +588,182 @@ function PaginaMarcadores({ participante, scores, onScoreChange, onFinalizar }) 
   );
 }
 
+
 // ── PÁGINA: RANKING ────────────────────────────────────────────────────────
+
+function PaginaStats({ participantes, scoresReales }) {
+  const todosPartidos = Object.values(GRUPOS).flatMap(g => g.partidos);
+
+  // ── 1. Marcadores más repetidos ─────────────────────────────────
+  const conteoMarcadores = {};
+  participantes.forEach(p => {
+    if (!p.scores) return;
+    todosPartidos.forEach(partido => {
+      const sc = p.scores[partido.id];
+      if (!sc || sc.g1 === "" || sc.g2 === "") return;
+      const key = `${sc.g1}-${sc.g2}`;
+      conteoMarcadores[key] = (conteoMarcadores[key] || 0) + 1;
+    });
+  });
+  const top10Marcadores = Object.entries(conteoMarcadores)
+    .sort((a,b) => b[1]-a[1]).slice(0,10);
+
+  // ── 2. Goles a favor por equipo (predicciones) ──────────────────
+  const golesFA = {}, golesFR = {};
+  const golesCA = {}, golesCR = {};
+  const ganados = {};
+
+  todosPartidos.forEach(p => {
+    [p.e1, p.e2].forEach(e => {
+      golesFA[e] = 0; golesFR[e] = 0;
+      golesCA[e] = 0; golesCR[e] = 0;
+      ganados[e] = { pred: 0, real: 0 };
+    });
+  });
+
+  // Predicciones promedio de participantes
+  const sumaGoles = {}; const cuentaGoles = {};
+  participantes.forEach(p => {
+    if (!p.scores) return;
+    todosPartidos.forEach(partido => {
+      const sc = p.scores[partido.id];
+      if (!sc || sc.g1==="" || sc.g2==="") return;
+      const g1=parseInt(sc.g1), g2=parseInt(sc.g2);
+      if (isNaN(g1)||isNaN(g2)) return;
+      if (!sumaGoles[partido.e1]) sumaGoles[partido.e1]={gf:0,gc:0,n:0};
+      if (!sumaGoles[partido.e2]) sumaGoles[partido.e2]={gf:0,gc:0,n:0};
+      sumaGoles[partido.e1].gf+=g1; sumaGoles[partido.e1].gc+=g2; sumaGoles[partido.e1].n++;
+      sumaGoles[partido.e2].gf+=g2; sumaGoles[partido.e2].gc+=g1; sumaGoles[partido.e2].n++;
+      if (g1>g2) ganados[partido.e1].pred++;
+      else if (g2>g1) ganados[partido.e2].pred++;
+    });
+  });
+
+  // Reales
+  todosPartidos.forEach(partido => {
+    const sc = scoresReales[partido.id];
+    if (!sc || sc.g1==="" || sc.g2==="") return;
+    const g1=parseInt(sc.g1), g2=parseInt(sc.g2);
+    if (isNaN(g1)||isNaN(g2)) return;
+    golesFR[partido.e1]=(golesFR[partido.e1]||0)+g1;
+    golesFR[partido.e2]=(golesFR[partido.e2]||0)+g2;
+    golesCR[partido.e1]=(golesCR[partido.e1]||0)+g2;
+    golesCR[partido.e2]=(golesCR[partido.e2]||0)+g1;
+    if (g1>g2) ganados[partido.e1].real++;
+    else if (g2>g1) ganados[partido.e2].real++;
+  });
+
+  const top10GF = Object.entries(sumaGoles)
+    .map(([e,v]) => ({e, pred: +(v.gf/v.n).toFixed(1), real: golesFR[e]||0}))
+    .sort((a,b) => b.pred-a.pred).slice(0,10);
+
+  const top10GC = Object.entries(sumaGoles)
+    .map(([e,v]) => ({e, pred: +(v.gc/v.n).toFixed(1), real: golesCR[e]||0}))
+    .sort((a,b) => b.pred-a.pred).slice(0,10);
+
+  const top8Ganados = Object.entries(ganados)
+    .map(([e,v]) => ({e, pred: v.pred, real: v.real}))
+    .sort((a,b) => b.pred-a.pred).slice(0,8);
+
+  const cardStyle = {
+    background:"rgba(255,255,255,0.04)", borderRadius:"12px",
+    padding:"14px", marginBottom:"16px",
+    border:"1px solid rgba(255,255,255,0.08)"
+  };
+  const headerRow = {
+    display:"grid", gridTemplateColumns:"1fr 60px 60px",
+    fontSize:"0.7rem", color:"#888", fontWeight:"700",
+    padding:"4px 6px", marginBottom:"4px"
+  };
+  const dataRow = (i) => ({
+    display:"grid", gridTemplateColumns:"1fr 60px 60px",
+    padding:"5px 6px", borderRadius:"6px", fontSize:"0.78rem",
+    background: i%2===0 ? "rgba(255,255,255,0.03)" : "transparent"
+  });
+
+  return (
+    <div>
+      {/* Marcadores más repetidos */}
+      <div style={cardStyle}>
+        <div style={{fontWeight:"800", color:"#f0c040", marginBottom:"10px"}}>
+          ⚽ Top 10 marcadores más pronosticados
+        </div>
+        <div style={{...headerRow, gridTemplateColumns:"1fr 80px"}}>
+          <span>Marcador</span><span style={{textAlign:"center"}}>Veces</span>
+        </div>
+        {top10Marcadores.map(([marc, cnt], i) => (
+          <div key={marc} style={{...dataRow(i), gridTemplateColumns:"1fr 80px"}}>
+            <span style={{fontWeight:"700"}}>{marc}</span>
+            <span style={{textAlign:"center", color:"#f0c040", fontWeight:"700"}}>{cnt}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* Goles a favor */}
+      <div style={cardStyle}>
+        <div style={{fontWeight:"800", color:"#f0c040", marginBottom:"10px"}}>
+          🥅 Top 10 equipos con más goles a favor
+        </div>
+        <div style={headerRow}>
+          <span>Equipo</span>
+          <span style={{textAlign:"center"}}>Pred.</span>
+          <span style={{textAlign:"center"}}>Real</span>
+        </div>
+        {top10GF.map(({e, pred, real}, i) => (
+          <div key={e} style={dataRow(i)}>
+            <span style={{overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}}>{e}</span>
+            <span style={{textAlign:"center", color:"#f0c040", fontWeight:"700"}}>{pred}</span>
+            <span style={{textAlign:"center", color:"#86efac", fontWeight:"700"}}>{real}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* Goles en contra */}
+      <div style={cardStyle}>
+        <div style={{fontWeight:"800", color:"#f0c040", marginBottom:"10px"}}>
+          🚨 Top 10 equipos con más goles en contra
+        </div>
+        <div style={headerRow}>
+          <span>Equipo</span>
+          <span style={{textAlign:"center"}}>Pred.</span>
+          <span style={{textAlign:"center"}}>Real</span>
+        </div>
+        {top10GC.map(({e, pred, real}, i) => (
+          <div key={e} style={dataRow(i)}>
+            <span style={{overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}}>{e}</span>
+            <span style={{textAlign:"center", color:"#f0c040", fontWeight:"700"}}>{pred}</span>
+            <span style={{textAlign:"center", color:"#86efac", fontWeight:"700"}}>{real}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* Partidos ganados */}
+      <div style={cardStyle}>
+        <div style={{fontWeight:"800", color:"#f0c040", marginBottom:"10px"}}>
+          🏆 Top 8 equipos con más partidos ganados
+        </div>
+        <div style={headerRow}>
+          <span>Equipo</span>
+          <span style={{textAlign:"center"}}>Pred.</span>
+          <span style={{textAlign:"center"}}>Real</span>
+        </div>
+        {top8Ganados.map(({e, pred, real}, i) => (
+          <div key={e} style={dataRow(i)}>
+            <span style={{overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}}>{e}</span>
+            <span style={{textAlign:"center", color:"#f0c040", fontWeight:"700"}}>{pred}</span>
+            <span style={{textAlign:"center", color:"#86efac", fontWeight:"700"}}>{real}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+
 function PaginaRanking({ scores, nombreActual }) {
   const [participantes, setParticipantes] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [tab, setTab] = useState("ranking");
 
   useEffect(() => {
     async function cargar() {
@@ -600,83 +783,104 @@ function PaginaRanking({ scores, nombreActual }) {
   return (
     <div style={{padding:"16px", maxWidth:"600px", margin:"0 auto"}}>
       <h2 style={{color:"#f0c040", marginTop:0, fontSize:"1.1rem"}}>🏆 Ranking de participantes</h2>
+      <div style={{display:"flex", gap:"8px", marginBottom:"16px"}}>
+        <button onClick={() => setTab("ranking")} style={{
+          flex:1, padding:"9px", borderRadius:"9px", border:"none",
+          background: tab==="ranking" ? "#f0c040" : "rgba(255,255,255,0.07)",
+          color: tab==="ranking" ? "#111" : "#aaa",
+          fontWeight:"700", cursor:"pointer"
+        }}>🏆 Tabla</button>
+        <button onClick={() => setTab("stats")} style={{
+         flex:1, padding:"9px", borderRadius:"9px", border:"none",
+         background: tab==="stats" ? "#f0c040" : "rgba(255,255,255,0.07)",
+         color: tab==="stats" ? "#111" : "#aaa",
+         fontWeight:"700", cursor:"pointer"
+        }}>📊 Estadísticas</button>
+      </div>
 
-      {nombreActual && (
-        <div style={{
-          background:"rgba(34,197,94,0.12)", borderRadius:"10px",
-          padding:"10px 14px", marginBottom:"16px",
-          border:"1px solid rgba(34,197,94,0.3)",
-          fontSize:"0.85rem", color:"#86efac",
-          fontWeight:"600",
+{tab === "ranking" && (
+  <>
+    {nombreActual && (
+      <div style={{
+        background:"rgba(34,197,94,0.12)", borderRadius:"10px",
+        padding:"10px 14px", marginBottom:"16px",
+        border:"1px solid rgba(34,197,94,0.3)",
+        fontSize:"0.85rem", color:"#86efac",
+        fontWeight:"600",
+      }}>
+        ✅ Registro completado para <strong>{nombreActual}</strong>
+      </div>
+    )}
+
+    {loading && (
+      <div style={{textAlign:"center", color:"#666", padding:"40px 0"}}>
+        <div style={{fontSize:"2rem"}}>⏳</div>
+        <div>Cargando ranking…</div>
+      </div>
+    )}
+
+    {!loading && ranking.length === 0 && (
+      <div style={{textAlign:"center", color:"#666", padding:"40px 0"}}>
+        <div style={{fontSize:"3rem"}}>📭</div>
+        <div>No hay participantes aún</div>
+      </div>
+    )}
+
+    {ranking.map((p,i) => {
+      const pts1 = calcPtsParticipante(p.seleccion1, null, scores, p.scores);
+      const pts2 = calcPtsParticipante(null, p.seleccion2, scores, p.scores);
+      const esTuyo = p.nombre === nombreActual;
+      return (
+        <div key={p.id || p.nombre} style={{
+          background: esTuyo
+            ? "linear-gradient(90deg,rgba(34,197,94,0.12),rgba(34,197,94,0.04))"
+            : i===0
+              ? "linear-gradient(90deg,rgba(240,192,64,0.15),rgba(240,192,64,0.05))"
+              : "rgba(255,255,255,0.04)",
+          borderRadius:"14px", padding:"14px", marginBottom:"10px",
+          border: esTuyo
+            ? "1px solid rgba(34,197,94,0.4)"
+            : i===0
+              ? "1px solid rgba(240,192,64,0.4)"
+              : "1px solid rgba(255,255,255,0.07)",
         }}>
-          ✅ Registro completado para <strong>{nombreActual}</strong>
-        </div>
-      )}
-
-      {loading && (
-        <div style={{textAlign:"center", color:"#666", padding:"40px 0"}}>
-          <div style={{fontSize:"2rem"}}>⏳</div>
-          <div>Cargando ranking…</div>
-        </div>
-      )}
-
-      {!loading && ranking.length === 0 && (
-        <div style={{textAlign:"center", color:"#666", padding:"40px 0"}}>
-          <div style={{fontSize:"3rem"}}>📭</div>
-          <div>No hay participantes aún</div>
-        </div>
-      )}
-
-      {ranking.map((p,i) => {
-        const pts1 = calcPtsParticipante(p.seleccion1, null, scores, p.scores);
-        const pts2 = calcPtsParticipante(null, p.seleccion2, scores, p.scores);
-        const esTuyo = p.nombre === nombreActual;
-        return (
-          <div key={p.id || p.nombre} style={{
-            background: esTuyo
-              ? "linear-gradient(90deg,rgba(34,197,94,0.12),rgba(34,197,94,0.04))"
-              : i===0
-                ? "linear-gradient(90deg,rgba(240,192,64,0.15),rgba(240,192,64,0.05))"
-                : "rgba(255,255,255,0.04)",
-            borderRadius:"14px", padding:"14px", marginBottom:"10px",
-            border: esTuyo
-              ? "1px solid rgba(34,197,94,0.4)"
-              : i===0
-                ? "1px solid rgba(240,192,64,0.4)"
-                : "1px solid rgba(255,255,255,0.07)",
-          }}>
-            <div style={{display:"flex", alignItems:"center", gap:"10px"}}>
-              <span style={{fontSize:"1.6rem"}}>{medals[i] || `#${i+1}`}</span>
-              <div style={{flex:1}}>
-                <div style={{fontWeight:"800", fontSize:"1rem"}}>
-                  {p.nombre} {esTuyo && <span style={{fontSize:"0.7rem", color:"#86efac"}}>(tú)</span>}
-                </div>
-                <div style={{fontSize:"0.72rem", color:"#888"}}>
-                  🏅 {p.seleccion1} &nbsp;·&nbsp; 🐴 {p.seleccion2}
-                </div>
+          <div style={{display:"flex", alignItems:"center", gap:"10px"}}>
+            <span style={{fontSize:"1.6rem"}}>{medals[i] || `#${i+1}`}</span>
+            <div style={{flex:1}}>
+              <div style={{fontWeight:"800", fontSize:"1rem"}}>
+                {p.nombre} {esTuyo && <span style={{fontSize:"0.7rem", color:"#86efac"}}>(tú)</span>}
               </div>
-              <div style={{textAlign:"right"}}>
-                <div style={{fontSize:"1.6rem", fontWeight:"900", color:"#f0c040", lineHeight:1}}>{p.total}</div>
-                <div style={{fontSize:"0.65rem", color:"#888"}}>puntos</div>
+              <div style={{fontSize:"0.72rem", color:"#888"}}>
+                🏅 {p.seleccion1} &nbsp;·&nbsp; 🐴 {p.seleccion2}
               </div>
             </div>
-            <div style={{display:"flex", gap:"8px", marginTop:"10px"}}>
-              {[{s:p.seleccion1, st:pts1},{s:p.seleccion2, st:pts2}].map(({s,st},j) => (
-  <div key={j} style={{
-    flex:1, background:"rgba(0,0,0,0.25)", borderRadius:"8px", padding:"8px",
-  }}>
-    <div style={{fontSize:"0.78rem", fontWeight:"700", marginBottom:"4px"}}>{s}</div>
-    <div style={{fontSize:"0.7rem", color:"#f0c040", fontWeight:"700"}}>Pts {st}</div>
-  </div>
-))}
+            <div style={{textAlign:"right"}}>
+              <div style={{fontSize:"1.6rem", fontWeight:"900", color:"#f0c040", lineHeight:1}}>{p.total}</div>
+              <div style={{fontSize:"0.65rem", color:"#888"}}>puntos</div>
             </div>
           </div>
-        );
-      })}
+          <div style={{display:"flex", gap:"8px", marginTop:"10px"}}>
+            {[{s:p.seleccion1, st:pts1},{s:p.seleccion2, st:pts2}].map(({s,st},j) => (
+              <div key={j} style={{
+                flex:1, background:"rgba(0,0,0,0.25)", borderRadius:"8px", padding:"8px",
+              }}>
+                <div style={{fontSize:"0.78rem", fontWeight:"700", marginBottom:"4px"}}>{s}</div>
+                <div style={{fontSize:"0.7rem", color:"#f0c040", fontWeight:"700"}}>Pts {st}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    })}
+  </>
+)}
+
+{tab === "stats" && (
+  <PaginaStats participantes={participantes} scoresReales={scores} />
+)}
     </div>
   );
 }
-
 // ── APP PRINCIPAL ──────────────────────────────────────────────────────────
 export default function App() {
   // "registro" | "marcadores" | "ranking"
