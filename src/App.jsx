@@ -77,8 +77,8 @@ const GRUPOS = {
          {id:"H2",f:1,e1:"Arabia Saudita 🇸🇦",e2:"Uruguay 🇺🇾",fecha:"15 jun"},
          {id:"H3",f:2,e1:"España 🇪🇸",e2:"Arabia Saudita 🇸🇦",fecha:"21 jun"},
          {id:"H4",f:2,e1:"Cabo Verde 🇨🇻",e2:"Uruguay 🇺🇾",fecha:"21 jun"},
-         {id:"H5",f:3,e1:"Arabia Saudita 🇸🇦",e2:"Uruguay 🇺🇾",fecha:"26 jun"},
-         {id:"H6",f:3,e1:"Cabo Verde 🇨🇻",e2:"España 🇪🇸",fecha:"26 jun"},
+         {id:"H5",f:3,e1:"Cabo Verde 🇨🇻",e2:"Arabia Saudita 🇸🇦",fecha:"26 jun"},
+         {id:"H6",f:3,e1:"Uruguay 🇺🇾",e2:"España 🇪🇸",fecha:"26 jun"},
        ]},
   I: { equipos: ["Francia 🇫🇷","Senegal 🇸🇳","Irak 🇮🇶","Noruega 🇳🇴"],
        partidos:[
