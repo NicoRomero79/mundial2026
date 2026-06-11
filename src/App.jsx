@@ -339,7 +339,7 @@ function PaginaRegistro({ onRegistrado, onVerRanking }) {
   const [sel2, setSel2] = useState("");
   const [msg, setMsg] = useState("");
   const [loading, setLoading] = useState(false);
-  const [modo, setModo] = useState("registro");
+  const [modo, setModo] = useState("login");
 
   const inputStyle = {
     width:"100%", padding:"10px 12px", borderRadius:"10px", fontSize:"0.9rem",
@@ -414,21 +414,14 @@ async function iniciarSesion() {
     <div style={{padding:"16px", maxWidth:"500px", margin:"0 auto"}}>
       <h2 style={{color:"#f0c040", marginTop:0, fontSize:"1.1rem"}}>📝 Registrar participante</h2>
 
-      <div style={{display:"flex", gap:"8px", marginBottom:"16px"}}>
-        <button onClick={() => setModo("registro")} style={{
-          flex:1, padding:"9px", borderRadius:"9px", border:"none",
-          background: modo==="registro" ? "#f0c040" : "rgba(255,255,255,0.07)",
-          color: modo==="registro" ? "#111" : "#aaa",
-          fontWeight:"700", cursor:"pointer"
-        }}>Registrarse</button>
-        
-        <button onClick={() => setModo("login")} style={{
-          flex:1, padding:"9px", borderRadius:"9px", border:"none",
-          background: modo==="login" ? "#f0c040" : "rgba(255,255,255,0.07)",
-          color: modo==="login" ? "#111" : "#aaa",
-          fontWeight:"700", cursor:"pointer"
-        }}>Ya tengo usuario</button>
-     </div>
+      <div style={{
+  background:"rgba(255,80,80,0.08)", borderRadius:"10px",
+  padding:"10px 14px", marginBottom:"16px",
+  border:"1px solid rgba(255,80,80,0.2)",
+  fontSize:"0.82rem", color:"#fca5a5", textAlign:"center", fontWeight:"600",
+}}>
+  🔒 El registro está cerrado. Solo pueden ingresar participantes registrados.
+</div>
 
       <label style={{fontSize:"0.78rem", color:"#aaa", marginBottom:"4px", display:"block"}}>Nombre</label>
       <input style={inputStyle} placeholder="Tu nombre…" value={nombre} onChange={e=>setNombre(e.target.value)} />
@@ -484,17 +477,7 @@ async function iniciarSesion() {
 )}
 
       
-      <button
-        onClick={onVerRanking}
-        style={{
-          width:"100%", padding:"11px", borderRadius:"12px",
-          border:"1.5px solid rgba(240,192,64,0.35)",
-          background:"rgba(240,192,64,0.07)", color:"#f0c040",
-          fontWeight:"700", fontSize:"0.9rem", cursor:"pointer",
-        }}
-      >
-        🏆 Ver ranking actual
-      </button>
+
     </div>
   );
 }
@@ -780,6 +763,63 @@ function PaginaRanking({ scores, nombreActual }) {
 
   const medals = ["🥇","🥈","🥉"];
 
+  function descargarPDF() {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: "landscape", format: "a2" });
+
+  const todosPartidos = Object.values(GRUPOS).flatMap(g => g.partidos);
+  const nombresParticipantes = participantes.map(p => p.nombre);
+
+  // Encabezado
+  doc.setFontSize(16);
+  doc.setTextColor(240, 192, 64);
+  doc.text("MUNDIAL 2026 - Pronósticos", 14, 15);
+  doc.setFontSize(9);
+  doc.setTextColor(100);
+  doc.text(`Generado: ${new Date().toLocaleDateString('es-CO')}`, 14, 21);
+
+  // Tabla
+  const limpiar = (str) => str
+  .replace(/🏴󠁧󠁢󠁳󠁣󠁴󠁿/g, '')
+  .replace(/🏴󠁧󠁢󠁥󠁮󠁧󠁿/g, '')
+  .replace(/[\u{1F1E0}-\u{1F1FF}]{2}/gu, '')
+  .replace(/[\u{1F000}-\u{1FFFF}]/gu, '')
+  .replace(/\s+/g, ' ')
+  .trim();
+  const columnas = [
+    { header: "Partido", dataKey: "partido" },
+    { header: "Fecha", dataKey: "fecha" },
+    ...nombresParticipantes.map(n => ({ header: limpiar(n), dataKey: n }))
+  ];
+
+  const filas = todosPartidos.map(p => {
+    const fila = {
+      partido: `${limpiar(p.e1)} vs ${limpiar(p.e2)}`,
+      fecha: p.fecha,
+    };
+    participantes.forEach(part => {
+      const sc = part.scores?.[p.id];
+      fila[part.nombre] = sc && sc.g1 !== "" && sc.g2 !== "" ? `${sc.g1}-${sc.g2}` : "-";
+    });
+    return fila;
+  });
+
+  doc.autoTable({
+  columns: columnas,
+  body: filas,
+  startY: 26,
+  styles: { fontSize: 6, cellPadding: 1.5, overflow: 'linebreak' },
+  headStyles: { fillColor: [15, 23, 42], textColor: [240, 192, 64], fontStyle: "bold", fontSize: 6 },
+  alternateRowStyles: { fillColor: [240, 245, 255] },
+  columnStyles: { 
+    partido: { cellWidth: 35 }, 
+    fecha: { cellWidth: 12 },
+  },
+  margin: { left: 5, right: 5 },
+});
+
+  doc.save("pronosticos_mundial2026.pdf");
+}
   return (
     <div style={{padding:"16px", maxWidth:"600px", margin:"0 auto"}}>
       <h2 style={{color:"#f0c040", marginTop:0, fontSize:"1.1rem"}}>🏆 Ranking de participantes</h2>
@@ -797,8 +837,20 @@ function PaginaRanking({ scores, nombreActual }) {
          fontWeight:"700", cursor:"pointer"
         }}>📊 Estadísticas</button>
       </div>
+      <button
+        onClick={descargarPDF}
+        style={{
+        width:"100%", padding:"10px", borderRadius:"10px", border:"none",
+        background:"rgba(255,255,255,0.06)", color:"#fff",
+        fontWeight:"700", fontSize:"0.85rem", cursor:"pointer",
+        marginBottom:"16px",
+        border:"1.5px solid rgba(255,255,255,0.15)",
+        }}
+      >
+         📄 Descargar pronósticos PDF
+       </button>
 
-{tab === "ranking" && (
+ {tab === "ranking" && (
   <>
     {nombreActual && (
       <div style={{
