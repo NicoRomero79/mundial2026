@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { createClient } from '@supabase/supabase-js';
+//import { syncResultados } from './syncResultados';
 
 const supabase = createClient(
   'https://upomuqwkiuzbfswcdfov.supabase.co',
@@ -177,11 +178,23 @@ function FlagSelect({ value, onChange, options, placeholder, disabled }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
 
-  useEffect(() => {
-    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, []);
+useEffect(() => {
+  async function cargarReales() {
+    console.log('Iniciando sync...');
+    try {
+      await supabase.functions.invoke('sync-resultados');
+    } catch(e) {
+      console.error('Error en sync:', e);
+    }
+    const { data } = await supabase.from('marcadores_reales').select('*');
+    if (data) {
+      const obj = {};
+      data.forEach(row => { obj[row.id] = { g1: row.g1, g2: row.g2 }; });
+      setScoresReales(obj);
+    }
+  }
+  cargarReales();
+}, []);
 
   return (
     <div ref={ref} style={{ position:"relative", marginBottom:"10px" }}>
@@ -475,8 +488,6 @@ async function iniciarSesion() {
     </button>
   </>
 )}
-
-      
 
     </div>
   );
@@ -942,6 +953,12 @@ export default function App() {
 
 useEffect(() => {
   async function cargarReales() {
+    console.log('Iniciando sync...');
+    try {
+      await supabase.functions.invoke('sync-resultados');
+    } catch(e) {
+      console.error('Error en sync:', e);
+    }
     const { data } = await supabase.from('marcadores_reales').select('*');
     if (data) {
       const obj = {};
