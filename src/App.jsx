@@ -778,7 +778,9 @@ function PaginaRanking({ scores, nombreActual }) {
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({ orientation: "landscape", format: "a2" });
 
-  const todosPartidos = Object.values(GRUPOS).flatMap(g => g.partidos);
+  const ordenFechas = ['11 jun','12 jun','13 jun','14 jun','15 jun','16 jun','17 jun','18 jun','19 jun','20 jun','21 jun','22 jun','23 jun','24 jun','25 jun','26 jun','27 jun'];
+  const todosPartidos = Object.values(GRUPOS).flatMap(g => g.partidos)
+  .sort((a, b) => ordenFechas.indexOf(a.fecha) - ordenFechas.indexOf(b.fecha));
   const nombresParticipantes = participantes.map(p => p.nombre);
 
   // Encabezado
