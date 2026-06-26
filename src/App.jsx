@@ -104,7 +104,7 @@ const GRUPOS = {
          {id:"K1",f:1,e1:"Portugal 🇵🇹",e2:"RD Congo 🇨🇩",fecha:"17 jun"},
          {id:"K2",f:1,e1:"Uzbekistán 🇺🇿",e2:"Colombia 🇨🇴",fecha:"17 jun"},
          {id:"K3",f:2,e1:"Portugal 🇵🇹",e2:"Uzbekistán 🇺🇿",fecha:"23 jun"},
-         {id:"K4",f:2,e1:"RD Congo 🇨🇩",e2:"Colombia 🇨🇴",fecha:"23 jun"},
+         {id:"K4",f:2,e1:"Colombia 🇨🇴",e2:"RD Congo 🇨🇩",fecha:"23 jun"},
          {id:"K5",f:3,e1:"Colombia 🇨🇴",e2:"Portugal 🇵🇹",fecha:"27 jun"},
          {id:"K6",f:3,e1:"RD Congo 🇨🇩",e2:"Uzbekistán 🇺🇿",fecha:"27 jun"},
        ]},
