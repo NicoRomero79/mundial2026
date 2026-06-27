@@ -558,10 +558,12 @@ function PaginaMarcadores({ participante, scores, onScoreChange, onFinalizar }) 
       {/* Botón Finalizar */}
       <div style={{marginTop:"24px", paddingTop:"16px", borderTop:"1px solid rgba(255,255,255,0.08)"}}>
         {!listo && (
-          <div style={{fontSize:"0.78rem", color:"#888", textAlign:"center", marginBottom:"8px"}}>
-            Completa todos los marcadores para finalizar
-          </div>
-        )}
+  <div style={{ fontSize: "0.78rem", color: "#888", textAlign: "center", marginBottom: "8px" }}>
+    {!listoNoBloqueados 
+      ? "Completa los pronósticos disponibles para finalizar"
+      : "⏳ Faltan equipos por confirmar para guardar"}
+  </div>
+)}
         <button
           onClick={listo ? onFinalizar : undefined}
           disabled={!listo}
@@ -756,15 +758,47 @@ function PaginaStats({ participantes, scoresReales }) {
 }
 
 
-function Pagina32avos({ participante, partidos, scoresReales, onFinalizar }) {
+function Pagina32avos({ participante, partidos, scoresReales, scoresRealesGrupos, onFinalizar }) {
   const PARTIDOS_BLOQUEADOS = ['R7','R8','R9','R10','R11','R12','R13','R14','R15','R16'];
+  const [scoresGruposUsuario, setScoresGruposUsuario] = useState(null);
+
+useEffect(() => {
+  async function cargarScores() {
+    const { data } = await supabase
+      .from('predicciones')
+      .select('scores, scores_32')
+      .eq('nombre', participante.nombre)
+      .single();
+    if (data) {
+      setScoresGruposUsuario(data.scores);
+      if (data.scores_32 && Object.keys(data.scores_32).length > 0) {
+        setScores32(prev => ({ ...prev, ...data.scores_32 }));
+      }
+    }
+  }
+  cargarScores();
+}, [participante.nombre]);
+
   const [scores32, setScores32] = useState(() => {
     const s = {};
     partidos.forEach(p => { s[p.id] = { g1: "", g2: "" }; });
     return s;
   });
 
-  const listo = partidos.length > 0 && Object.values(scores32).every(sc => sc.g1 !== "" && sc.g2 !== "");
+const listoNoBloqueados = partidos.length > 0 && partidos
+  .filter(p => !PARTIDOS_BLOQUEADOS.includes(p.id))
+  .every(p => scores32[p.id]?.g1 !== "" && scores32[p.id]?.g2 !== "");
+
+const listoBloqueados = partidos.length > 0 && partidos
+  .filter(p => PARTIDOS_BLOQUEADOS.includes(p.id))
+  .every(p => {
+    const sc = scores32[p.id];
+    return sc && sc.g1 !== "" && sc.g2 !== "";
+  });
+
+const listo = PARTIDOS_BLOQUEADOS.length === 0 
+  ? listoNoBloqueados 
+  : listoNoBloqueados && listoBloqueados;
 
   function updateScore(pid, campo, val) {
     setScores32(prev => ({ ...prev, [pid]: { ...prev[pid], [campo]: val } }));
@@ -789,23 +823,27 @@ function Pagina32avos({ participante, partidos, scoresReales, onFinalizar }) {
         </div>
       </div>
 
+      <div style={{
+  background:"rgba(255,255,255,0.04)", borderRadius:"12px",
+  padding:"14px", marginBottom:"16px",
+  border:"1px solid rgba(255,255,255,0.08)",
+  display:"flex", justifyContent:"space-between", alignItems:"center"
+}}>
+  <div>
+    <div style={{fontSize:"0.7rem", color:"#aaa", marginBottom:"6px", fontWeight:"600"}}>PUNTAJE FASE DE GRUPOS</div>
+    <div style={{fontSize:"0.78rem", color:"#ccc"}}>🏅 {participante.sel1}</div>
+    <div style={{fontSize:"0.78rem", color:"#ccc", marginTop:"3px"}}>🐴 {participante.sel2}</div>
+  </div>
+  <div style={{textAlign:"right"}}>
+    <div style={{fontSize:"2.8rem", fontWeight:"900", color:"#f0c040", lineHeight:1}}>
+      {calcPtsParticipante(participante.sel1, participante.sel2, scoresRealesGrupos, scoresGruposUsuario)}
+    </div>
+    <div style={{fontSize:"0.7rem", color:"#888"}}>puntos</div>
+  </div>
+</div>
+
       <h2 style={{ color: "#f0c040", marginTop: 0, fontSize: "1.1rem" }}>⚔️ Pronósticos · 32avos de Final</h2>
-
-      {/* Progreso */}
-      <div style={{ marginBottom: "16px" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.75rem", color: "#aaa", marginBottom: "4px" }}>
-          <span>Partidos completados</span>
-          <span style={{ color: "#f0c040", fontWeight: "700" }}>{llenos}/{total}</span>
-        </div>
-        <div style={{ height: "6px", background: "rgba(255,255,255,0.08)", borderRadius: "4px", overflow: "hidden" }}>
-          <div style={{
-            height: "100%", width: `${pct}%`,
-            background: "linear-gradient(90deg,#f0c040,#d4a800)",
-            borderRadius: "4px", transition: "width 0.4s ease"
-          }} />
-        </div>
-      </div>
-
+      
       {/* Partidos */}
       {partidos.length === 0 ? (
         <div style={{ textAlign: "center", color: "#666", padding: "40px 0" }}>
@@ -1235,12 +1273,13 @@ useEffect(() => {
       )}
 
       {pagina === "32avos" && (
-        <Pagina32avos
-          participante={participanteActual}
-          partidos={partidos32}
-          scoresReales={scoresReales32}
-         onFinalizar={handleFinalizar32}
-        />
+       <Pagina32avos
+       participante={participanteActual}
+       partidos={partidos32}
+       scoresReales={scoresReales32}
+       scoresRealesGrupos={scoresReales}
+       onFinalizar={handleFinalizar32}
+       />
       )}
 
       {pagina === "ranking" && (
