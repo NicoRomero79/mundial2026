@@ -104,7 +104,7 @@ const GRUPOS = {
          {id:"K1",f:1,e1:"Portugal 🇵🇹",e2:"RD Congo 🇨🇩",fecha:"17 jun"},
          {id:"K2",f:1,e1:"Uzbekistán 🇺🇿",e2:"Colombia 🇨🇴",fecha:"17 jun"},
          {id:"K3",f:2,e1:"Portugal 🇵🇹",e2:"Uzbekistán 🇺🇿",fecha:"23 jun"},
-         {id:"K4",f:2,e1:"Colombia 🇨🇴",e2:"RD Congo 🇨🇩",fecha:"23 jun"},
+         {id:"K4",f:2,e1:"RD Congo 🇨🇩",e2:"Colombia 🇨🇴",fecha:"23 jun"},
          {id:"K5",f:3,e1:"Colombia 🇨🇴",e2:"Portugal 🇵🇹",fecha:"27 jun"},
          {id:"K6",f:3,e1:"RD Congo 🇨🇩",e2:"Uzbekistán 🇺🇿",fecha:"27 jun"},
        ]},
@@ -417,10 +417,12 @@ async function iniciarSesion() {
   // Si ya tiene scores guardados, va directo al ranking
   // Si no, va a completar marcadores
   const tieneScores = data.scores && Object.keys(data.scores).length > 0;
-  onRegistrado(
+  const tiene32 = data.scores_32 && Object.keys(data.scores_32).length > 0;
+    onRegistrado(
     { nombre: data.nombre, telefono: data.telefono, sel1: data.seleccion1, sel2: data.seleccion2 },
-    tieneScores  // true = va a ranking, false = va a marcadores
-  );
+    tieneScores,
+    tiene32
+);
 }
 
   return (
@@ -754,6 +756,133 @@ function PaginaStats({ participantes, scoresReales }) {
 }
 
 
+function Pagina32avos({ participante, partidos, scoresReales, onFinalizar }) {
+  const PARTIDOS_BLOQUEADOS = ['R7','R8','R9','R10','R11','R12','R13','R14','R15','R16'];
+  const [scores32, setScores32] = useState(() => {
+    const s = {};
+    partidos.forEach(p => { s[p.id] = { g1: "", g2: "" }; });
+    return s;
+  });
+
+  const listo = partidos.length > 0 && Object.values(scores32).every(sc => sc.g1 !== "" && sc.g2 !== "");
+
+  function updateScore(pid, campo, val) {
+    setScores32(prev => ({ ...prev, [pid]: { ...prev[pid], [campo]: val } }));
+  }
+
+  const total = partidos.length;
+  const llenos = Object.values(scores32).filter(sc => sc.g1 !== "" && sc.g2 !== "").length;
+  const pct = total > 0 ? Math.round((llenos / total) * 100) : 0;
+
+ return (
+    <div style={{ padding: "16px", maxWidth: "600px", margin: "0 auto" }}>
+      {/* Bienvenida */}
+      <div style={{
+        background: "rgba(240,192,64,0.1)", borderRadius: "12px",
+        padding: "12px 16px", marginBottom: "16px",
+        border: "1px solid rgba(240,192,64,0.25)",
+      }}>
+        <div style={{ fontSize: "0.78rem", color: "#aaa" }}>Registrando como</div>
+        <div style={{ fontWeight: "800", fontSize: "1rem", color: "#fff" }}>{participante.nombre}</div>
+        <div style={{ fontSize: "0.8rem", color: "#aaa", marginTop: "2px" }}>
+          🏅 {participante.sel1} &nbsp;·&nbsp; 🐴 {participante.sel2}
+        </div>
+      </div>
+
+      <h2 style={{ color: "#f0c040", marginTop: 0, fontSize: "1.1rem" }}>⚔️ Pronósticos · 32avos de Final</h2>
+
+      {/* Progreso */}
+      <div style={{ marginBottom: "16px" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.75rem", color: "#aaa", marginBottom: "4px" }}>
+          <span>Partidos completados</span>
+          <span style={{ color: "#f0c040", fontWeight: "700" }}>{llenos}/{total}</span>
+        </div>
+        <div style={{ height: "6px", background: "rgba(255,255,255,0.08)", borderRadius: "4px", overflow: "hidden" }}>
+          <div style={{
+            height: "100%", width: `${pct}%`,
+            background: "linear-gradient(90deg,#f0c040,#d4a800)",
+            borderRadius: "4px", transition: "width 0.4s ease"
+          }} />
+        </div>
+      </div>
+
+      {/* Partidos */}
+      {partidos.length === 0 ? (
+        <div style={{ textAlign: "center", color: "#666", padding: "40px 0" }}>
+          <div style={{ fontSize: "2rem" }}>⏳</div>
+          <div>Cargando partidos...</div>
+        </div>
+      ) : (
+        <>
+          {partidos.map(p => {
+            const sc = scores32[p.id] || { g1: "", g2: "" };
+            const filled = sc.g1 !== "" && sc.g2 !== "";
+            const real = scoresReales[p.id];
+            return (
+              <div key={p.id} style={{
+                background: filled ? "rgba(240,192,64,0.06)" : "rgba(255,255,255,0.04)",
+                borderRadius: "12px", padding: "10px 12px", marginBottom: "8px",
+                border: filled ? "1px solid rgba(240,192,64,0.25)" : "1px solid rgba(255,255,255,0.08)",
+                transition: "all 0.2s",
+              }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                  <span style={{ fontSize: "0.7rem", color: "#aaa", minWidth: "60px" }}>{p.fecha} {p.hora}</span>
+                  <span style={{ flex: 1, fontSize: "0.82rem", textAlign: "right", fontWeight: "600" }}>{p.e1}</span>
+                  <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                    <ScoreInput
+                      value={sc.g1}
+                      onChange={v => !PARTIDOS_BLOQUEADOS.includes(p.id) && updateScore(p.id, "g1", v)}
+                    />
+                    <span style={{ color: "#f0c040", fontWeight: "900", fontSize: "1.1rem" }}>–</span>
+                    <ScoreInput
+                      value={sc.g2}
+                      onChange={v => !PARTIDOS_BLOQUEADOS.includes(p.id) && updateScore(p.id, "g2", v)}
+                    />
+                  </div>
+                  <span style={{ flex: 1, fontSize: "0.82rem", fontWeight: "600" }}>{p.e2}</span>
+                  {filled && <span style={{ fontSize: "0.8rem" }}>✅</span>}
+                  {PARTIDOS_BLOQUEADOS.includes(p.id) && (
+                    <span style={{ fontSize: "0.7rem", color: "#f0c040" }}>⏳ Por confirmar</span>
+                  )}
+                </div>
+                {real && real.g1 !== "" && (
+                  <div style={{ fontSize: "0.7rem", color: "#86efac", marginTop: "4px", textAlign: "center" }}>
+                    Real: {real.g1} – {real.g2}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+
+          {/* Botón finalizar */}
+          <div style={{ marginTop: "24px", paddingTop: "16px", borderTop: "1px solid rgba(255,255,255,0.08)" }}>
+            {!listo && (
+              <div style={{ fontSize: "0.78rem", color: "#888", textAlign: "center", marginBottom: "8px" }}>
+                Completa todos los pronósticos para finalizar
+              </div>
+            )}
+            <button
+              onClick={listo ? () => onFinalizar(scores32) : undefined}
+              disabled={!listo}
+              style={{
+                width: "100%", padding: "15px", borderRadius: "12px", border: "none",
+                background: listo ? "linear-gradient(90deg,#22c55e,#16a34a)" : "rgba(255,255,255,0.08)",
+                color: listo ? "#fff" : "#555",
+                fontWeight: "900", fontSize: "1rem",
+                cursor: listo ? "pointer" : "not-allowed",
+                boxShadow: listo ? "0 4px 20px rgba(34,197,94,0.35)" : "none",
+                transition: "all 0.3s",
+              }}
+            >
+              {listo ? "✅ GUARDAR PRONÓSTICOS" : "🔒 FALTAN PRONÓSTICOS"}
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 function PaginaRanking({ scores, nombreActual }) {
   const [participantes, setParticipantes] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -952,6 +1081,8 @@ export default function App() {
   const [pagina, setPagina] = useState("registro");
   const [participanteActual, setParticipanteActual] = useState(null);
   const [scoresReales, setScoresReales] = useState({});
+  const [partidos32, setPartidos32] = useState([]);
+  const [scoresReales32, setScoresReales32] = useState({});
 
 useEffect(() => {
   async function cargarReales() {
@@ -966,6 +1097,17 @@ useEffect(() => {
       const obj = {};
       data.forEach(row => { obj[row.id] = { g1: row.g1, g2: row.g2 }; });
       setScoresReales(obj);
+    }
+
+    // 👇 AGREGA ESTO
+    const { data: p32 } = await supabase.from('partidos_32').select('*').order('orden', { ascending: true });
+    if (p32) setPartidos32(p32);
+
+    const { data: m32 } = await supabase.from('marcadores_32').select('*');
+    if (m32) {
+      const obj = {};
+      m32.forEach(row => { obj[row.id] = { g1: row.g1, g2: row.g2 }; });
+      setScoresReales32(obj);
     }
   }
   cargarReales();
@@ -985,9 +1127,15 @@ useEffect(() => {
     setScores(prev => ({...prev, [pid]: {...prev[pid], [campo]: val}}));
   }
 
-  function handleRegistrado(participante, esLogin) {
+  function handleRegistrado(participante, esLogin, tiene32) {
   setParticipanteActual(participante);
-  setPagina(esLogin ? "ranking" : "marcadores");
+  if (!esLogin) {
+    setPagina("marcadores");
+  } else if (!tiene32) {
+    setPagina("32avos");
+  } else {
+    setPagina("ranking");
+  }
 }
 
   async function handleFinalizar() {
@@ -1007,6 +1155,22 @@ useEffect(() => {
 
   setPagina("ranking");
   }
+
+  async function handleFinalizar32(scores32) {
+  if (!participanteActual) return;
+
+  const { error } = await supabase
+    .from('predicciones')
+    .update({ scores_32: scores32 })
+    .eq('nombre', participanteActual.nombre);
+
+  if (error) {
+    alert("Error guardando pronósticos de 32avos: " + error.message);
+    return;
+  }
+
+  setPagina("ranking");
+}
 
   return (
     <div style={{
@@ -1035,10 +1199,12 @@ useEffect(() => {
         fontSize:"0.78rem",
       }}>
         {[
-          {key:"registro", label:"📝 Registro"},
-          {key:"marcadores", label:"⚽ Marcadores"},
-          {key:"ranking", label:"🏆 Ranking"},
-        ].map(({key, label}, i) => (
+            {key:"registro", label:"📝 Registro"},
+            {key:"marcadores", label:"⚽ Grupos"},
+            {key:"32avos", label:"⚔️ 32avos"},
+            {key:"ranking", label:"🏆 Ranking"},
+         ]
+        .map(({key, label}, i) => (
           <div key={key} style={{display:"flex", alignItems:"center", gap:"8px"}}>
             {i > 0 && <span style={{color:"#444"}}>›</span>}
             <span style={{
@@ -1065,6 +1231,15 @@ useEffect(() => {
           scores={scores}
           onScoreChange={updateScore}
           onFinalizar={handleFinalizar}
+        />
+      )}
+
+      {pagina === "32avos" && (
+        <Pagina32avos
+          participante={participanteActual}
+          partidos={partidos32}
+          scoresReales={scoresReales32}
+         onFinalizar={handleFinalizar32}
         />
       )}
 
