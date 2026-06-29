@@ -417,7 +417,7 @@ async function iniciarSesion() {
   // Si ya tiene scores guardados, va directo al ranking
   // Si no, va a completar marcadores
   const tieneScores = data.scores && Object.keys(data.scores).length > 0;
-  const tiene32 = data.scores_32 && Object.keys(data.scores_32).length > 0;
+  const tiene32 = data.scores_32 && Object.keys(data.scores_32).length === 16;
     onRegistrado(
     { nombre: data.nombre, telefono: data.telefono, sel1: data.seleccion1, sel2: data.seleccion2 },
     tieneScores,
@@ -784,11 +784,17 @@ useEffect(() => {
     partidos.forEach(p => { s[p.id] = { g1: "", g2: "" }; });
     return s;
   });
+const [penales32, setPenales32] = useState({});
 
 const listoNoBloqueados = partidos.length > 0 && partidos
   .filter(p => !PARTIDOS_BLOQUEADOS.includes(p.id))
-  .every(p => scores32[p.id]?.g1 !== "" && scores32[p.id]?.g2 !== "");
-
+  .every(p => {
+    const sc = scores32[p.id];
+    if (!sc || sc.g1 === "" || sc.g2 === "") return false;
+    const esEmpate = parseInt(sc.g1) === parseInt(sc.g2);
+    if (esEmpate && !penales32[p.id]) return false;
+    return true;
+  });
 const listoBloqueados = partidos.length > 0 && partidos
   .filter(p => PARTIDOS_BLOQUEADOS.includes(p.id))
   .every(p => {
@@ -836,7 +842,7 @@ const listo = PARTIDOS_BLOQUEADOS.length === 0
   </div>
   <div style={{textAlign:"right"}}>
     <div style={{fontSize:"2.8rem", fontWeight:"900", color:"#f0c040", lineHeight:1}}>
-      {calcPtsParticipante(participante.sel1, participante.sel2, scoresRealesGrupos, scoresGruposUsuario)}
+      {calcPtsParticipante(participante.sel1, participante.sel2, scoresRealesGrupos, scoresGruposUsuario) + calcPtsParticipante(participante.sel1, participante.sel2, scoresReales, scores32)}
     </div>
     <div style={{fontSize:"0.7rem", color:"#888"}}>puntos</div>
   </div>
@@ -853,42 +859,78 @@ const listo = PARTIDOS_BLOQUEADOS.length === 0
       ) : (
         <>
           {partidos.map(p => {
-            const sc = scores32[p.id] || { g1: "", g2: "" };
-            const filled = sc.g1 !== "" && sc.g2 !== "";
-            const real = scoresReales[p.id];
-            return (
-              <div key={p.id} style={{
-                background: filled ? "rgba(240,192,64,0.06)" : "rgba(255,255,255,0.04)",
-                borderRadius: "12px", padding: "10px 12px", marginBottom: "8px",
-                border: filled ? "1px solid rgba(240,192,64,0.25)" : "1px solid rgba(255,255,255,0.08)",
-                transition: "all 0.2s",
-              }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
-                  <span style={{ fontSize: "0.7rem", color: "#aaa", minWidth: "60px" }}>{p.fecha} {p.hora}</span>
-                  <span style={{ flex: 1, fontSize: "0.82rem", textAlign: "right", fontWeight: "600" }}>{p.e1}</span>
-                  <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                    <ScoreInput
-                      value={sc.g1}
-                      onChange={v => !PARTIDOS_BLOQUEADOS.includes(p.id) && updateScore(p.id, "g1", v)}
-                    />
-                    <span style={{ color: "#f0c040", fontWeight: "900", fontSize: "1.1rem" }}>–</span>
-                    <ScoreInput
-                      value={sc.g2}
-                      onChange={v => !PARTIDOS_BLOQUEADOS.includes(p.id) && updateScore(p.id, "g2", v)}
-                    />
-                  </div>
-                  <span style={{ flex: 1, fontSize: "0.82rem", fontWeight: "600" }}>{p.e2}</span>
-                  {filled && <span style={{ fontSize: "0.8rem" }}>✅</span>}
-                  {PARTIDOS_BLOQUEADOS.includes(p.id) && (
-                    <span style={{ fontSize: "0.7rem", color: "#f0c040" }}>⏳ Por confirmar</span>
-                  )}
-                </div>
-                {real && real.g1 !== "" && (
-                  <div style={{ fontSize: "0.7rem", color: "#86efac", marginTop: "4px", textAlign: "center" }}>
-                    Real: {real.g1} – {real.g2}
-                  </div>
-                )}
+           const sc = scores32[p.id] || { g1: "", g2: "" };
+           const filled = sc.g1 !== "" && sc.g2 !== "";
+           const esEmpate = filled && parseInt(sc.g1) === parseInt(sc.g2);
+           const real = scoresReales[p.id];
+           const bloqueado = PARTIDOS_BLOQUEADOS.includes(p.id);
+             return (
+               <div key={p.id} style={{
+                 background: filled ? "rgba(240,192,64,0.06)" : "rgba(255,255,255,0.04)",
+                 borderRadius: "12px", padding: "10px 12px", marginBottom: "8px",
+                 border: filled ? "1px solid rgba(240,192,64,0.25)" : "1px solid rgba(255,255,255,0.08)",
+                 transition: "all 0.2s",
+               }}>
+               <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                 <span style={{ fontSize: "0.7rem", color: "#aaa", minWidth: "60px" }}>{p.fecha} {p.hora}</span>
+                 <span style={{ flex: 1, fontSize: "0.82rem", textAlign: "right", fontWeight: "600" }}>{p.e1}</span>
+               <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+              <ScoreInput
+                value={sc.g1}
+                onChange={v => !bloqueado && updateScore(p.id, "g1", v)}
+             />
+              <span style={{ color: "#f0c040", fontWeight: "900", fontSize: "1.1rem" }}>–</span>
+               <ScoreInput
+               value={sc.g2}
+               onChange={v => !bloqueado && updateScore(p.id, "g2", v)}
+             />
               </div>
+               <span style={{ flex: 1, fontSize: "0.82rem", fontWeight: "600" }}>{p.e2}</span>
+               {filled && !esEmpate && <span style={{ fontSize: "0.8rem" }}>✅</span>}
+               {bloqueado && (
+               <span style={{ fontSize: "0.7rem", color: "#f0c040" }}>⏳ Por confirmar</span>
+               )}
+             </div>
+
+             {esEmpate && !bloqueado && (
+               <div style={{
+               marginTop: "8px", padding: "8px 10px",
+               background: "rgba(240,192,64,0.08)", borderRadius: "8px",
+               border: "1px solid rgba(240,192,64,0.2)"
+             }}>
+             <div style={{ fontSize: "0.72rem", color: "#f0c040", fontWeight: "700", marginBottom: "6px" }}>
+             ⚽ Empate — ¿Quién pasa en penales?
+             </div>
+             <div style={{ display: "flex", gap: "8px" }}>
+              <button
+               onClick={() => setPenales32(prev => ({ ...prev, [p.id]: p.e1 }))}
+               style={{
+                flex: 1, padding: "7px", borderRadius: "8px", border: "none",
+                background: penales32[p.id] === p.e1 ? "#f0c040" : "rgba(255,255,255,0.07)",
+                color: penales32[p.id] === p.e1 ? "#111" : "#ccc",
+                fontWeight: "700", fontSize: "0.75rem", cursor: "pointer"
+               }}
+              >{p.e1}</button>
+              <button
+                onClick={() => setPenales32(prev => ({ ...prev, [p.id]: p.e2 }))}
+                style={{
+                  flex: 1, padding: "7px", borderRadius: "8px", border: "none",
+                  background: penales32[p.id] === p.e2 ? "#f0c040" : "rgba(255,255,255,0.07)",
+                  color: penales32[p.id] === p.e2 ? "#111" : "#ccc",
+                  fontWeight: "700", fontSize: "0.75rem", cursor: "pointer"
+                }}
+              >{p.e2}</button>
+             </div>
+               {penales32[p.id] && <div style={{ fontSize: "0.7rem", color: "#86efac", marginTop: "4px" }}>✅ Pasa: {penales32[p.id]}</div>}
+              </div>
+              )}
+
+              {real && real.g1 !== "" && (
+               <div style={{ fontSize: "0.7rem", color: "#86efac", marginTop: "4px", textAlign: "center" }}>
+                 Real: {real.g1} – {real.g2}
+               </div>
+              )}
+           </div>
             );
           })}
 
@@ -900,7 +942,7 @@ const listo = PARTIDOS_BLOQUEADOS.length === 0
               </div>
             )}
             <button
-              onClick={listo ? () => onFinalizar(scores32) : undefined}
+              onClick={listo ? () => onFinalizar(scores32, penales32) : undefined}
               disabled={!listo}
               style={{
                 width: "100%", padding: "15px", borderRadius: "12px", border: "none",
@@ -1194,16 +1236,16 @@ useEffect(() => {
   setPagina("ranking");
   }
 
-  async function handleFinalizar32(scores32) {
+async function handleFinalizar32(scores32, penales32) {
   if (!participanteActual) return;
 
   const { error } = await supabase
     .from('predicciones')
-    .update({ scores_32: scores32 })
+    .update({ scores_32: scores32, penales_32: penales32 })
     .eq('nombre', participanteActual.nombre);
 
   if (error) {
-    alert("Error guardando pronósticos de 32avos: " + error.message);
+    alert("Error guardando pronósticos: " + error.message);
     return;
   }
 
