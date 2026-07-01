@@ -172,6 +172,27 @@ function calcPtsParticipante(selInsignia, selCaballo, scoresReales, scoresUsuari
   return total;
 }
 
+function calcPts32(selInsignia, selCaballo, scoresReales32, scoresUsuario32, partidos32) {
+  if (!scoresUsuario32 || !scoresReales32 || partidos32.length === 0) return 0;
+  let total = 0;
+  partidos32.forEach(p => {
+    const real = scoresReales32[p.id];
+    const pred = scoresUsuario32[p.id];
+    if (!real || real.g1 === "" || real.g2 === "") return;
+    if (!pred || pred.g1 === "" || pred.g2 === "") return;
+    const rG1 = parseInt(real.g1), rG2 = parseInt(real.g2);
+    const pG1 = parseInt(pred.g1), pG2 = parseInt(pred.g2);
+    if (isNaN(rG1)||isNaN(rG2)||isNaN(pG1)||isNaN(pG2)) return;
+
+    let bonus = 0;
+    if (p.e1 === selInsignia || p.e2 === selInsignia) bonus = 5;
+    else if (p.e1 === selCaballo || p.e2 === selCaballo) bonus = 3;
+
+    total += ptsPartido(rG1, rG2, pG1, pG2, bonus);
+  });
+  return total;
+}
+
 
 // ── CUSTOM SELECT CON BANDERAS ─────────────────────────────────────────────
 function FlagSelect({ value, onChange, options, placeholder, disabled }) {
@@ -963,7 +984,7 @@ const listo = PARTIDOS_BLOQUEADOS.length === 0
   );
 }
 
-function PaginaRanking({ scores, nombreActual }) {
+function PaginaRanking({ scores, nombreActual, partidos32, scoresReales32 }) {
   const [participantes, setParticipantes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState("ranking");
@@ -978,7 +999,10 @@ function PaginaRanking({ scores, nombreActual }) {
   }, []);
 
   const ranking = participantes
-    .map(p => ({...p, total: calcPtsParticipante(p.seleccion1, p.seleccion2, scores, p.scores)}))
+   .map(p => ({...p, total: 
+     calcPtsParticipante(p.seleccion1, p.seleccion2, scores, p.scores) +
+     calcPts32(p.seleccion1, p.seleccion2, scoresReales32, p.scores_32, partidos32)
+   }))
     .sort((a,b) => b.total - a.total);
 
   const medals = ["🥇","🥈","🥉"];
@@ -1101,8 +1125,10 @@ function PaginaRanking({ scores, nombreActual }) {
     )}
 
     {ranking.map((p,i) => {
-      const pts1 = calcPtsParticipante(p.seleccion1, null, scores, p.scores);
-      const pts2 = calcPtsParticipante(null, p.seleccion2, scores, p.scores);
+       const pts1 = calcPtsParticipante(p.seleccion1, null, scores, p.scores) +
+             calcPts32(p.seleccion1, null, scoresReales32, p.scores_32, partidos32);
+      const pts2 = calcPtsParticipante(null, p.seleccion2, scores, p.scores) +
+             calcPts32(null, p.seleccion2, scoresReales32, p.scores_32, partidos32);
       const esTuyo = p.nombre === nombreActual;
       return (
         <div key={p.id || p.nombre} style={{
@@ -1324,10 +1350,12 @@ async function handleFinalizar32(scores32, penales32) {
        />
       )}
 
-      {pagina === "ranking" && (
+       {pagina === "ranking" && (
         <PaginaRanking
           scores={scoresReales}
-            nombreActual={participanteActual?.nombre}
+          nombreActual={participanteActual?.nombre}
+          partidos32={partidos32}
+          scoresReales32={scoresReales32}
         />
       )}
 
