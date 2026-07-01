@@ -1011,60 +1011,60 @@ function PaginaRanking({ scores, nombreActual, partidos32, scoresReales32 }) {
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({ orientation: "landscape", format: "a2" });
 
-  const ordenFechas = ['11 jun','12 jun','13 jun','14 jun','15 jun','16 jun','17 jun','18 jun','19 jun','20 jun','21 jun','22 jun','23 jun','24 jun','25 jun','26 jun','27 jun'];
-  const todosPartidos = Object.values(GRUPOS).flatMap(g => g.partidos)
-  .sort((a, b) => ordenFechas.indexOf(a.fecha) - ordenFechas.indexOf(b.fecha));
   const nombresParticipantes = participantes.map(p => p.nombre);
+  const limpiar = (str) => str
+    .replace(/🏴󠁧󠁢󠁳󠁣󠁴󠁿/g, '')
+    .replace(/🏴󠁧󠁢󠁥󠁮󠁧󠁿/g, '')
+    .replace(/[\u{1F1E0}-\u{1F1FF}]{2}/gu, '')
+    .replace(/[\u{1F000}-\u{1FFFF}]/gu, '')
+    .replace(/\s+/g, ' ')
+    .trim();
 
-  // Encabezado
   doc.setFontSize(16);
   doc.setTextColor(240, 192, 64);
-  doc.text("MUNDIAL 2026 - Pronósticos", 14, 15);
+  doc.text("MUNDIAL 2026 - Pronósticos 32avos de Final", 14, 15);
   doc.setFontSize(9);
   doc.setTextColor(100);
   doc.text(`Generado: ${new Date().toLocaleDateString('es-CO')}`, 14, 21);
 
-  // Tabla
-  const limpiar = (str) => str
-  .replace(/🏴󠁧󠁢󠁳󠁣󠁴󠁿/g, '')
-  .replace(/🏴󠁧󠁢󠁥󠁮󠁧󠁿/g, '')
-  .replace(/[\u{1F1E0}-\u{1F1FF}]{2}/gu, '')
-  .replace(/[\u{1F000}-\u{1FFFF}]/gu, '')
-  .replace(/\s+/g, ' ')
-  .trim();
   const columnas = [
-    { header: "Partido", dataKey: "partido" },
-    { header: "Fecha", dataKey: "fecha" },
-    ...nombresParticipantes.map(n => ({ header: limpiar(n), dataKey: n }))
-  ];
+  { header: "Participante", dataKey: "participante" },
+  { header: "Insignia", dataKey: "insignia" },
+  { header: "Caballo", dataKey: "caballo" },
+  ...partidos32.map(p => ({ 
+    header: `${limpiar(p.e1)} vs ${limpiar(p.e2)}\n${p.fecha} ${p.hora}`, 
+    dataKey: p.id 
+  }))
+];
 
-  const filas = todosPartidos.map(p => {
-    const fila = {
-      partido: `${limpiar(p.e1)} vs ${limpiar(p.e2)}`,
-      fecha: p.fecha,
-    };
-    participantes.forEach(part => {
-      const sc = part.scores?.[p.id];
-      fila[part.nombre] = sc && sc.g1 !== "" && sc.g2 !== "" ? `${sc.g1}-${sc.g2}` : "-";
-    });
-    return fila;
+const filas = participantes.map(p => {
+  const fila = {
+    participante: limpiar(p.nombre),
+    insignia: limpiar(p.seleccion1),
+    caballo: limpiar(p.seleccion2),
+  };
+  partidos32.forEach(partido => {
+    const sc = p.scores_32?.[partido.id];
+    fila[partido.id] = sc && sc.g1 !== "" && sc.g2 !== "" ? `${sc.g1}-${sc.g2}` : "-";
+  });
+  return fila;
+});
+  doc.autoTable({
+    columns: columnas,
+    body: filas,
+    startY: 26,
+    styles: { fontSize: 6, cellPadding: 1.5, overflow: 'linebreak' },
+    headStyles: { fillColor: [15, 23, 42], textColor: [240, 192, 64], fontStyle: "bold", fontSize: 6 },
+    alternateRowStyles: { fillColor: [240, 245, 255] },
+    columnStyles: { 
+      participante: { cellWidth: 35 }, 
+      insignia: { cellWidth: 25 },
+      caballo: { cellWidth: 25 },
+    },
+    margin: { left: 5, right: 5 },
   });
 
-  doc.autoTable({
-  columns: columnas,
-  body: filas,
-  startY: 26,
-  styles: { fontSize: 6, cellPadding: 1.5, overflow: 'linebreak' },
-  headStyles: { fillColor: [15, 23, 42], textColor: [240, 192, 64], fontStyle: "bold", fontSize: 6 },
-  alternateRowStyles: { fillColor: [240, 245, 255] },
-  columnStyles: { 
-    partido: { cellWidth: 35 }, 
-    fecha: { cellWidth: 12 },
-  },
-  margin: { left: 5, right: 5 },
-});
-
-  doc.save("pronosticos_mundial2026.pdf");
+  doc.save("pronosticos_32avos.pdf");
 }
   return (
     <div style={{padding:"16px", maxWidth:"600px", margin:"0 auto"}}>
