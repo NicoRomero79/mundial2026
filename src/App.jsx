@@ -172,7 +172,7 @@ function calcPtsParticipante(selInsignia, selCaballo, scoresReales, scoresUsuari
   return total;
 }
 
-function calcPts32(selInsignia, selCaballo, scoresReales32, scoresUsuario32, partidos32) {
+function calcPts32(selInsignia, selCaballo, scoresReales32, scoresUsuario32, partidos32, penalesReales, penalesUsuario) {
   if (!scoresUsuario32 || !scoresReales32 || partidos32.length === 0) return 0;
   let total = 0;
   partidos32.forEach(p => {
@@ -188,11 +188,21 @@ function calcPts32(selInsignia, selCaballo, scoresReales32, scoresUsuario32, par
     if (p.e1 === selInsignia || p.e2 === selInsignia) bonus = 5;
     else if (p.e1 === selCaballo || p.e2 === selCaballo) bonus = 3;
 
-    total += ptsPartido(rG1, rG2, pG1, pG2, bonus);
+    let pts = ptsPartido(rG1, rG2, pG1, pG2, bonus);
+
+    // Bono penal: +1 si acertó quién pasa
+    if (pts > 0 && rG1 === rG2 && pG1 === pG2) {
+      const ganadorReal = penalesReales?.[p.id];
+      const ganadorPred = penalesUsuario?.[p.id];
+      if (ganadorReal && ganadorPred && ganadorReal === ganadorPred) {
+        pts += 1;
+      }
+    }
+
+    total += pts;
   });
   return total;
 }
-
 
 // ── CUSTOM SELECT CON BANDERAS ─────────────────────────────────────────────
 function FlagSelect({ value, onChange, options, placeholder, disabled }) {
@@ -984,7 +994,7 @@ const listo = PARTIDOS_BLOQUEADOS.length === 0
   );
 }
 
-function PaginaRanking({ scores, nombreActual, partidos32, scoresReales32 }) {
+function PaginaRanking({ scores, nombreActual, partidos32, scoresReales32, penalesReales }) {
   const [participantes, setParticipantes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState("ranking");
@@ -1001,8 +1011,8 @@ function PaginaRanking({ scores, nombreActual, partidos32, scoresReales32 }) {
   const ranking = participantes
    .map(p => ({...p, total: 
      calcPtsParticipante(p.seleccion1, p.seleccion2, scores, p.scores) +
-     calcPts32(p.seleccion1, p.seleccion2, scoresReales32, p.scores_32, partidos32)
-   }))
+     calcPts32(p.seleccion1, p.seleccion2, scoresReales32, p.scores_32, partidos32, penalesReales, p.penales_32)
+    }))
     .sort((a,b) => b.total - a.total);
 
   const medals = ["🥇","🥈","🥉"];
@@ -1125,11 +1135,11 @@ const filas = participantes.map(p => {
     )}
 
     {ranking.map((p,i) => {
+       const esTuyo = p.nombre === nombreActual;
        const pts1 = calcPtsParticipante(p.seleccion1, null, scores, p.scores) +
-             calcPts32(p.seleccion1, null, scoresReales32, p.scores_32, partidos32);
-      const pts2 = calcPtsParticipante(null, p.seleccion2, scores, p.scores) +
-             calcPts32(null, p.seleccion2, scoresReales32, p.scores_32, partidos32);
-      const esTuyo = p.nombre === nombreActual;
+             calcPts32(p.seleccion1, null, scoresReales32, p.scores_32, partidos32, penalesReales, p.penales_32);
+       const pts2 = calcPtsParticipante(null, p.seleccion2, scores, p.scores) +
+             calcPts32(null, p.seleccion2, scoresReales32, p.scores_32, partidos32, penalesReales, p.penales_32);
       return (
         <div key={p.id || p.nombre} style={{
           background: esTuyo
@@ -1189,6 +1199,7 @@ export default function App() {
   const [scoresReales, setScoresReales] = useState({});
   const [partidos32, setPartidos32] = useState([]);
   const [scoresReales32, setScoresReales32] = useState({});
+  const [penalesReales, setPenalesReales] = useState({});
 
 useEffect(() => {
   async function cargarReales() {
@@ -1215,6 +1226,12 @@ useEffect(() => {
       m32.forEach(row => { obj[row.id] = { g1: row.g1, g2: row.g2 }; });
       setScoresReales32(obj);
     }
+    const { data: pr } = await supabase.from('penales_reales').select('*');
+if (pr) {
+  const obj = {};
+  pr.forEach(row => { obj[row.id] = row.ganador; });
+  setPenalesReales(obj);
+}
   }
   cargarReales();
 }, []);
@@ -1351,12 +1368,13 @@ async function handleFinalizar32(scores32, penales32) {
       )}
 
        {pagina === "ranking" && (
-        <PaginaRanking
-          scores={scoresReales}
-          nombreActual={participanteActual?.nombre}
-          partidos32={partidos32}
-          scoresReales32={scoresReales32}
-        />
+         <PaginaRanking
+           scores={scoresReales}
+           nombreActual={participanteActual?.nombre}
+           partidos32={partidos32}
+           scoresReales32={scoresReales32}
+           penalesReales={penalesReales}
+         />
       )}
 
       <div style={{textAlign:"center", padding:"20px", color:"#444", fontSize:"0.7rem"}}>
